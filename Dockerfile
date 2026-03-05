@@ -37,6 +37,7 @@ COPY benches/ benches/
 COPY crates/ crates/
 COPY firmware/ firmware/
 COPY web/ web/
+COPY skills/ skills/
 # Keep release builds resilient when frontend dist assets are not prebuilt in Git.
 RUN mkdir -p web/dist && \
     if [ ! -f web/dist/index.html ]; then \
@@ -85,11 +86,40 @@ EOF
 # ── Stage 2: Development Runtime (Debian) ────────────────────
 FROM debian:trixie-slim@sha256:f6e2cfac5cf956ea044b4bd75e6397b4372ad88fe00908045e9a0d21712ae3ba AS dev
 
-# Install essential runtime dependencies only (use docker-compose.override.yml for dev tools)
+# Use USTC mirror for faster downloads in China
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list 2>/dev/null || true
+
+# Install development tools and toolchains
 RUN apt-get update && apt-get install -y \
-    ca-certificates \
+    # Build essentials
+    build-essential \
+    # Network tools
     curl \
+    wget \
+    # Version control
+    git \
+    # GitHub CLI
+    gh \
+    # Modern file tools (ripgrep, fd-find)
+    ripgrep \
+    fd-find \
+    # Python toolchain
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    # Rust toolchain
+    rustc \
+    cargo \
+    # Essential certs
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Create fd symlink if fd-find is installed as fdfind
+RUN if command -v fdfind &> /dev/null && ! command -v fd &> /dev/null; then \
+    ln -s $(which fdfind) /usr/local/bin/fd; \
+    fi
 
 COPY --from=builder /zeroclaw-data /zeroclaw-data
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
@@ -102,19 +132,16 @@ RUN chown 65534:65534 /zeroclaw-data/.zeroclaw/config.toml
 # Use consistent workspace path
 ENV ZEROCLAW_WORKSPACE=/zeroclaw-data/workspace
 ENV HOME=/zeroclaw-data
-# Defaults for local dev (Ollama) - matches config.template.toml
-ENV PROVIDER="ollama"
-ENV ZEROCLAW_MODEL="llama3.2"
 ENV ZEROCLAW_GATEWAY_PORT=42617
 
-# Note: API_KEY is intentionally NOT set here to avoid confusion.
-# It is set in config.toml as the Ollama URL.
+# Note: Provider and model are read from config.toml, NOT set via environment.
+# This allows config file edits to take effect without rebuild.
 
 WORKDIR /zeroclaw-data
 USER 65534:65534
 EXPOSE 42617
 ENTRYPOINT ["zeroclaw"]
-CMD ["gateway"]
+CMD ["daemon"]
 
 # ── Stage 3: Production Runtime (Distroless) ─────────────────
 FROM gcr.io/distroless/cc-debian13:nonroot@sha256:84fcd3c223b144b0cb6edc5ecc75641819842a9679a3a58fd6294bec47532bf7 AS release
@@ -136,4 +163,4 @@ WORKDIR /zeroclaw-data
 USER 65534:65534
 EXPOSE 42617
 ENTRYPOINT ["zeroclaw"]
-CMD ["gateway"]
+CMD ["daemon"]
