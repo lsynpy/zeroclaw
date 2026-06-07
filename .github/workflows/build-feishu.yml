@@ -9,7 +9,8 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -22,8 +23,9 @@ jobs:
           submodules: true
           fetch-depth: 1
 
-      - name: Get patched Dockerfile
-        run: curl -sL "https://raw.githubusercontent.com/lsynpy/zeroclaw/main/Dockerfile" > Dockerfile
+      - name: Use PR #5187 Dockerfile (cross-compile ARM64)
+        run: |
+          curl -sL "https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/pull/5187/head/Dockerfile" > Dockerfile
 
       - uses: docker/setup-buildx-action@v3
 
@@ -34,7 +36,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push (ARM64, channel-lark)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -42,6 +44,6 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
-            ZEROCLAW_CARGO_FEATURES=channels-full
+            ZEROCLAW_CARGO_FEATURES=channel-lark
           cache-from: type=gha
           cache-to: type=gha,mode=max
