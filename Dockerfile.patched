@@ -46,12 +46,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         dpkg --add-architecture arm64 && \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-            pkg-config gcc-aarch64-linux-gnu libc6-dev-arm64-cross && \
+            pkg-config gcc-aarch64-linux-gnu libc6-dev-arm64-cross libssl-dev:arm64 && \
         rustup target add aarch64-unknown-linux-gnu; \
     else \
         apt-get install -y --no-install-recommends \
             pkg-config; \
     fi && \
+    apt-get install -y --no-install-recommends \
+        libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # 1. Copy manifests to cache dependencies
@@ -104,15 +106,17 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     if [ "$TARGETARCH" = "arm64" ]; then \
       export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
              PKG_CONFIG_ALLOW_CROSS=1 \
-             PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig; \
+             PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
+             OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu \
+             OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu; \
       RUST_TARGET=aarch64-unknown-linux-gnu; \
     else \
       RUST_TARGET=x86_64-unknown-linux-gnu; \
     fi && \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
-      cargo build --profile dist --locked --features "$ZEROCLAW_CARGO_FEATURES" --target "$RUST_TARGET"; \
+      cargo build --profile dist --features "$ZEROCLAW_CARGO_FEATURES" --target "$RUST_TARGET"; \
     else \
-      cargo build --profile dist --locked --target "$RUST_TARGET"; \
+      cargo build --profile dist --target "$RUST_TARGET"; \
     fi
 RUN rm -rf src benches crates xtask tools/fill-translations
 
@@ -131,7 +135,9 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     if [ "$TARGETARCH" = "arm64" ]; then \
       export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
              PKG_CONFIG_ALLOW_CROSS=1 \
-             PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig; \
+             PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
+             OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu \
+             OPENSSL_INCLUDE_DIR=/usr/include/aarch64-linux-gnu; \
       RUST_TARGET=aarch64-unknown-linux-gnu; \
     else \
       RUST_TARGET=x86_64-unknown-linux-gnu; \
@@ -147,9 +153,9 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
            target/"$RUST_TARGET"/dist/.fingerprint/fill-translations-* \
            target/"$RUST_TARGET"/dist/deps/fill_translations-* && \
     if [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
-      cargo build --profile dist --locked --features "$ZEROCLAW_CARGO_FEATURES" --target "$RUST_TARGET"; \
+      cargo build --profile dist --features "$ZEROCLAW_CARGO_FEATURES" --target "$RUST_TARGET"; \
     else \
-      cargo build --profile dist --locked --target "$RUST_TARGET"; \
+      cargo build --profile dist --target "$RUST_TARGET"; \
     fi && \
     cp target/"$RUST_TARGET"/dist/zeroclaw /app/zeroclaw && \
     if [ "$TARGETARCH" = "arm64" ]; then \
@@ -225,7 +231,9 @@ ENTRYPOINT ["zeroclaw"]
 CMD ["daemon"]
 
 # ── Stage 3: Production Runtime (Distroless) ─────────────────
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:84fcd3c223b144b0cb6edc5ecc75641819842a9679a3a58fd6294bec47532bf7 AS release
+FROM debian:trixie-slim AS release
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/zeroclaw /usr/local/bin/zeroclaw
 COPY --from=builder /zeroclaw-data /zeroclaw-data
