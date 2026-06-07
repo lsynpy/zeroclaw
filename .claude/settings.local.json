@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker run:*)",
+      "Bash(xxd:*)",
+      "Bash(cp:*)",
+      "Bash(docker:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo:*)"
+    ]
+  }
+}

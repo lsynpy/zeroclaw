@@ -49,6 +49,7 @@ COPY --parents crates/*/Cargo.toml ./
 COPY --parents crates/aardvark-sys/build.rs ./
 # apps/tauri: .dockerignore whitelists only Cargo.toml; src and build.rs are stubbed below.
 COPY apps/tauri/Cargo.toml apps/tauri/Cargo.toml
+COPY apps/zerocode/Cargo.toml apps/zerocode/Cargo.toml
 # tools/fill-translations and xtask are dev/build tools; copy manifests only so
 # Cargo can resolve the workspace, then stub their entry points so the
 # dependency pre-fetch step succeeds without building them into the image.
@@ -65,12 +66,16 @@ RUN mkdir -p src src/bin benches apps/tauri/src tools/fill-translations/src xtas
     && echo "fn main() {}" > benches/agent_benchmarks.rs \
     && echo "fn main() {}" > apps/tauri/src/main.rs \
     && echo "fn main() {}" > apps/tauri/build.rs \
+    && mkdir -p apps/zerocode/src \
+    && echo "fn main() {}" > apps/zerocode/src/main.rs \
     && echo "fn main() {}" > tools/fill-translations/src/main.rs \
     && echo "" > xtask/src/lib.rs \
     && echo "fn main() {}" > xtask/src/bin/mdbook.rs \
     && echo "fn main() {}" > xtask/src/bin/fluent.rs \
     && echo "fn main() {}" > xtask/src/bin/web.rs \
-    && for d in crates/*/; do mkdir -p "${d}src" && printf '' > "${d}src/lib.rs"; done
+    && for d in crates/*/; do mkdir -p "${d}src" && printf '' > "${d}src/lib.rs"; done \
+    && mkdir -p crates/zeroclaw-hardware/examples \
+    && echo "fn main() {}" > crates/zeroclaw-hardware/examples/esp32_sim.rs
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
@@ -88,6 +93,7 @@ COPY crates/ crates/
 COPY xtask/ xtask/
 COPY tools/fill-translations/ tools/fill-translations/
 COPY *.rs .
+COPY locales.toml .
 RUN touch src/main.rs
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
